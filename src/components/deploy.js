@@ -5,7 +5,8 @@ import SendToken from './send';
 import Web3 from 'web3';
 import { ethers } from 'ethers';
 
-import Entrypoint from '../abi/EntryPoint.json'
+import ErrorPopup from './errorPopUp';
+import Entrypoint from '../abi/EntryPoint.json';
 import Account from '../abi/SimpleAccount.json';
 import AccountFactory from '../abi/AccountFactory.json';
 
@@ -28,6 +29,7 @@ function DeployContract(props) {
     const [contractInfoFetch, setContractInfoFetch] = useState(false);
     const [loading, setLoading] = useState(false);
     const [contractAddress, setContractAddress] = useState("");
+    const [errorMessage, setErrorMessage] = useState('');
 
     const entryContract = new web3.eth.Contract(EntrypointABI, ENTRYPOINT_ADDRESS);
 
@@ -82,21 +84,31 @@ function DeployContract(props) {
         return opHash;
     };
 
+    const handleApiResponse = (response) => {
+        if (response.error) {
+            setErrorMessage(response.error.message); // Set the error message
+        }
+    };
+
+    const closePopup = () => {
+        setErrorMessage(''); // Clear the error message to close the popup
+    };
+
     async function checkContract(sender) {
         if (!sender || !web3) return;
-  
+
         try {
-          // Fetch contract bytecode
-          const code = await web3.eth.getCode(sender);
-  
-          // Check if bytecode is not empty
-          if (code !== '0x') {
-            setIsContract(true);
-          } else {
-            setIsContract(false);
-          }
+            // Fetch contract bytecode
+            const code = await web3.eth.getCode(sender);
+
+            // Check if bytecode is not empty
+            if (code !== '0x') {
+                setIsContract(true);
+            } else {
+                setIsContract(false);
+            }
         } catch (error) {
-          console.error("Error checking contract:", error);
+            console.error("Error checking contract:", error);
         }
     };
 
@@ -167,6 +179,7 @@ function DeployContract(props) {
             // Send the signed userOp to the bundler
             console.log('Contract Deploying...');
             const OpHash = await sendUserOperation(userOp);
+            handleApiResponse(OpHash);
             console.log('userOperation hash', OpHash);
             console.log('Contract Deployed');
 
@@ -181,26 +194,31 @@ function DeployContract(props) {
 
     return (
         <div>
-            {!loading ?
+            {!errorMessage ?
                 <div>
-                    <h1>Contract Information</h1>
-                    <ContractInfo address={props.address} setIsContract={(e) => setIsContract(e)} setContractInfoFetch={(e) => setContractInfoFetch(e)} setContractAddress={(e)=> setContractAddress(e)} />
-
-                    {contractInfoFetch &&
+                    {!loading ?
                         <div>
-                            {isContract ? <div>
-                                <SendToken address={props.address} contractAddress={contractAddress}/>
-                            </div> : <>
-                                <p>*initialy fund the wallet and click the create contract for the first time</p>
-                                <button onClick={deployContract}>createContract</button>
-                            </>
+                            <h1>Contract Information</h1>
+                            <ContractInfo address={props.address} setIsContract={(e) => setIsContract(e)} setContractInfoFetch={(e) => setContractInfoFetch(e)} setContractAddress={(e) => setContractAddress(e)} />
+
+                            {contractInfoFetch &&
+                                <div>
+                                    {isContract ? <div>
+                                        <SendToken address={props.address} contractAddress={contractAddress} />
+                                    </div> : <>
+                                        <p>*initialy fund the wallet and click the create contract for the first time</p>
+                                        <button onClick={deployContract}>createContract</button>
+                                    </>
+                                    }
+                                </div>
                             }
-                        </div>
+                        </div> : <>
+                            <Loadingscr />
+                        </>
                     }
                 </div> : <>
-                    <Loadingscr />
-                </>
-            }
+                    <ErrorPopup errorMessage={errorMessage} onClose={closePopup} />
+                </>}
         </div>
     )
 }

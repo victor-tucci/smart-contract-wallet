@@ -7,7 +7,9 @@ import DeployContract from './components/deploy';
 import SendToken from './components/send';
 import EoaWalletDetails from "./components/eoaWallet";
 import Web3 from 'web3';
-// require('dotenv').config();
+// import dotenv from 'dotenv';
+
+// dotenv.config();
 
 function App() {
   const [address, setAddress] = useState("");
@@ -18,7 +20,7 @@ function App() {
   const btnhandler = () => {
     if (window.ethereum) {
       console.log('Network version:', window.ethereum.networkVersion);
-
+      // console.log('print rpc:', process.env.RPC_URL);
       // Initialize Web3
       setWeb3(new Web3(window.ethereum));
       

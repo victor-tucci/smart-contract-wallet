@@ -5,7 +5,7 @@ import Web3 from 'web3';
 import { ethers } from 'ethers';
 
 import ErrorPopup from './errorPopUp';
-import Entrypoint from '../abi/EntryPoint.json'
+import Entrypoint from '../abi/EntryPoint.json';
 import Account from '../abi/SimpleAccount.json';
 import AccountFactory from '../abi/AccountFactory.json';
 

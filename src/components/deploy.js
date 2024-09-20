@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState,useEffect } from 'react';
 import ContractInfo from './contractDetails';
 import Loadingscr from './loading';
 import SendToken from './send';
@@ -24,9 +24,9 @@ const FACTORY_ADDRESS = "0x5ed4386F818f34f1f0c5b13C8eD513eDdF407B30";
 const salt = 123;
 
 function DeployContract(props) {
-
     const [isContract, setIsContract] = useState(false);
     const [contractInfoFetch, setContractInfoFetch] = useState(false);
+    const [balance, setBalance] = useState('');
     const [loading, setLoading] = useState(false);
     const [contractAddress, setContractAddress] = useState("");
     const [errorMessage, setErrorMessage] = useState('');
@@ -50,6 +50,13 @@ function DeployContract(props) {
         "type": "function"
     }
 
+    // Debugging function to log error message whenever it changes
+    useEffect(() => {
+        if (errorMessage) {
+            console.log("Error Message Set: ", errorMessage);
+        }
+    }, [errorMessage]);
+
     async function getAddress(initCode) {
         var sender;
         try {
@@ -63,31 +70,34 @@ function DeployContract(props) {
     }
 
     const estimateUserOperationGas = async (userOp) => {
-
         const estimateGas = await bundlerWeb3.currentProvider.sendAsync({
             jsonrpc: "2.0",
             method: "eth_estimateUserOperationGas",
             params: [userOp, ENTRYPOINT_ADDRESS],
             id: new Date().getTime()
-        })
+        });
         return estimateGas;
     };
 
     const sendUserOperation = async (userOp) => {
-
         const opHash = await bundlerWeb3.currentProvider.sendAsync({
             jsonrpc: "2.0",
             method: "eth_sendUserOperation",
             params: [userOp, ENTRYPOINT_ADDRESS],
             id: new Date().getTime()
-        })
+        });
         return opHash;
     };
 
     const handleApiResponse = (response) => {
         if (response.error) {
-            setErrorMessage(response.error.message); // Set the error message
+            setErrorMessage(response.error.message);
         }
+    };
+    
+    const handleError = (error) => {
+        setErrorMessage(error); // Set error message in state
+        console.log("Error occurred: ", error); // Log for debugging
     };
 
     const closePopup = () => {
@@ -98,10 +108,7 @@ function DeployContract(props) {
         if (!sender || !web3) return;
 
         try {
-            // Fetch contract bytecode
             const code = await web3.eth.getCode(sender);
-
-            // Check if bytecode is not empty
             if (code !== '0x') {
                 setIsContract(true);
             } else {
@@ -113,19 +120,24 @@ function DeployContract(props) {
     };
 
     const deployContract = async () => {
-        console.log('contract deploy constructing...');
+        console.log('Contract deploy constructing...', balance);
+
+        if (balance < 0.1) {
+            console.log('Insufficient funds');
+            handleError("Insufficient funds to deploy contract.");
+            return;
+        }
+
         setLoading(true);
 
         try {
             const AccountBytecode = Account.bytecode;
 
-            // Encode the constructor arguments
             const encodedArgs = web3.eth.abi.encodeParameters(
                 ['address', 'address'],
                 [ENTRYPOINT_ADDRESS, props.address]
             );
 
-            // Concatenate bytecode with the encoded constructor arguments
             const bytecodeWithArgs = AccountBytecode + encodedArgs.slice(2);
 
             const encodedFunctionCall = web3.eth.abi.encodeFunctionCall(deployFunctionAbi, [bytecodeWithArgs, salt]);
@@ -144,10 +156,9 @@ function DeployContract(props) {
                 nonce: "0x" + (await entryContract.methods.getNonce(sender, 0).call()).toString(16),
                 initCode,
                 callData: "0x",
-                paymasterAndData: "0x", // we're not using a paymaster, for now
-                signature: "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c", // we're not validating a signature, for now
+                paymasterAndData: "0x", 
+                signature: "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c", 
             };
-            // console.log({userOp});
 
             const gasEstimates = await estimateUserOperationGas(userOp);
             console.log('eth_estimateUserOperationGas', gasEstimates);
@@ -156,7 +167,6 @@ function DeployContract(props) {
             userOp.preVerificationGas = preVerificationGas;
             userOp.verificationGasLimit = verificationGasLimit;
             userOp.callGasLimit = callGasLimit;
-            // userOp.maxFeePerGas = maxFeePerGas;
             userOp.maxPriorityFeePerGas = maxPriorityFeePerGas;
 
             const { maxFeePerGas } = await userOpProvider.getFeeData();
@@ -165,10 +175,6 @@ function DeployContract(props) {
             const userOpHash = await entryContract.methods.getUserOpHash(userOp).call();
             console.log({ userOpHash });
 
-            // Sign the userOpHash using personal_sign
-            console.log('props.address', props.address);
-
-            // const signature = await web3.eth.personal.sign(userOpHash, props.address);
             userOp.signature = await window.ethereum.request({
                 method: "personal_sign",
                 params: [userOpHash, props.address],
@@ -176,8 +182,6 @@ function DeployContract(props) {
 
             console.log({ userOp });
 
-            // Send the signed userOp to the bundler
-            console.log('Contract Deploying...');
             const OpHash = await sendUserOperation(userOp);
             handleApiResponse(OpHash);
             console.log('userOperation hash', OpHash);
@@ -186,41 +190,48 @@ function DeployContract(props) {
             await checkContract(sender);
         } catch (error) {
             console.error("Error calling the deploy:", error);
+            handleError(error.message); // Ensure any error is caught and displayed
         }
 
         setLoading(false);
-
     };
 
     return (
         <div>
-            {!errorMessage ?
+            {!errorMessage ? (
                 <div>
-                    {!loading ?
+                    {!loading ? (
                         <div>
                             <h1>Contract Information</h1>
-                            <ContractInfo address={props.address} setIsContract={(e) => setIsContract(e)} setContractInfoFetch={(e) => setContractInfoFetch(e)} setContractAddress={(e) => setContractAddress(e)} />
-
-                            {contractInfoFetch &&
+                            <ContractInfo
+                                address={props.address}
+                                setIsContract={setIsContract}
+                                setContractInfoFetch={setContractInfoFetch}
+                                setContractAddress={setContractAddress}
+                                setBalance={setBalance}
+                            />
+                            {contractInfoFetch && (
                                 <div>
-                                    {isContract ? <div>
+                                    {isContract ? (
                                         <SendToken address={props.address} contractAddress={contractAddress} />
-                                    </div> : <>
-                                        <p>*initialy fund the wallet and click the create contract for the first time</p>
-                                        <button onClick={deployContract}>createContract</button>
-                                    </>
-                                    }
+                                    ) : (
+                                        <>
+                                            <p>*Initially fund the wallet and click the create contract for the first time</p>
+                                            <button onClick={deployContract}>Create Contract</button>
+                                        </>
+                                    )}
                                 </div>
-                            }
-                        </div> : <>
-                            <Loadingscr />
-                        </>
-                    }
-                </div> : <>
-                    <ErrorPopup errorMessage={errorMessage} onClose={closePopup} />
-                </>}
+                            )}
+                        </div>
+                    ) : (
+                        <Loadingscr />
+                    )}
+                </div>
+            ) : (
+                <ErrorPopup errorMessage={errorMessage} onClose={closePopup} />
+            )}
         </div>
-    )
+    );
 }
 
 export default DeployContract;

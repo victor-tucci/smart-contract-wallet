@@ -1,23 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 function ErrorPopup({ errorMessage, onClose }) {
+  console.log('errorMessage from errorPopup', errorMessage);
+  
+  const popupRef = useRef(null);
+
   useEffect(() => {
-    const handleClickOutside = () => {
-      onClose(); // Close popup on screen click
+    const handleClickOutside = (event) => {
+      // Check if the clicked element is outside of the popup
+      if (popupRef.current && !popupRef.current.contains(event.target)) {
+        onClose(); // Close popup
+      }
     };
 
     // Add event listener to detect screen click
-    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
 
     // Cleanup event listener on component unmount
     return () => {
-      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [onClose]);
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.popup}>
+      <div style={styles.popup} ref={popupRef}>
         <h2>Error</h2>
         <p>{errorMessage}</p>
       </div>

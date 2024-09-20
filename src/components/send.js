@@ -120,8 +120,8 @@ function SendToken({ address, contractAddress }) {
 
         const { preVerificationGas, verificationGasLimit, callGasLimit, maxPriorityFeePerGas } = gasEstimates.result;
         userOp.preVerificationGas = preVerificationGas;
-        // userOp.verificationGasLimit = "0x70d6";
-        userOp.verificationGasLimit = verificationGasLimit;
+        userOp.verificationGasLimit = "0x20d6";
+        // userOp.verificationGasLimit = verificationGasLimit;
         userOp.callGasLimit = callGasLimit;
         userOp.maxPriorityFeePerGas = maxPriorityFeePerGas;
 

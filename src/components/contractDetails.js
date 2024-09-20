@@ -77,6 +77,7 @@ function ContractInfo(props) {
                 const formattedBalance = web3.utils.fromWei(balance, "ether");
                 // console.log("Balance is:", formattedBalance);
                 setBalance(formattedBalance);
+                props.setBalance(formattedBalance);  // Update balance in props for parent component
             } catch (error) {
                 console.error("Error fetching balance:", error);
             }

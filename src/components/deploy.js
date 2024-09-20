@@ -92,6 +92,7 @@ function DeployContract(props) {
     const handleApiResponse = (response) => {
         if (response.error) {
             setErrorMessage(response.error.message);
+            setLoading(false);
         }
     };
     
@@ -162,6 +163,8 @@ function DeployContract(props) {
 
             const gasEstimates = await estimateUserOperationGas(userOp);
             console.log('eth_estimateUserOperationGas', gasEstimates);
+            if(handleApiResponse(gasEstimates))
+                return;
 
             const { preVerificationGas, verificationGasLimit, callGasLimit, maxPriorityFeePerGas } = gasEstimates.result;
             userOp.preVerificationGas = preVerificationGas;
@@ -183,7 +186,8 @@ function DeployContract(props) {
             console.log({ userOp });
 
             const OpHash = await sendUserOperation(userOp);
-            handleApiResponse(OpHash);
+            if(handleApiResponse(OpHash))
+                return;
             console.log('userOperation hash', OpHash);
             console.log('Contract Deployed');
 

@@ -82,6 +82,10 @@ function SendToken({ address, contractAddress }) {
     const handleApiResponse = (response) => {
         if (response.error) {
             setErrorMessage(response.error.message); // Set the error message
+            setLoading(false);
+            setToAddress('');
+            setAmount('');
+            return true; // Return true
         }
     };
 
@@ -117,11 +121,14 @@ function SendToken({ address, contractAddress }) {
 
         const gasEstimates = await estimateUserOperationGas(userOp);
         console.log('eth_estimateUserOperationGas', gasEstimates);
+        if(handleApiResponse(gasEstimates))
+            return;
 
+        // Set gas limits for the userOp
         const { preVerificationGas, verificationGasLimit, callGasLimit, maxPriorityFeePerGas } = gasEstimates.result;
         userOp.preVerificationGas = preVerificationGas;
-        userOp.verificationGasLimit = "0x20d6";
-        // userOp.verificationGasLimit = verificationGasLimit;
+        // userOp.verificationGasLimit = "0x20d6";
+        userOp.verificationGasLimit = verificationGasLimit;
         userOp.callGasLimit = callGasLimit;
         userOp.maxPriorityFeePerGas = maxPriorityFeePerGas;
 
@@ -143,7 +150,8 @@ function SendToken({ address, contractAddress }) {
         console.log('Transaction submitting...');
         const OpHash = await sendUserOperation(userOp);
         console.log('userOperation hash', OpHash);
-        handleApiResponse(OpHash);
+        if(handleApiResponse(OpHash))
+            return;
         console.log('Transaction sucessfully sent');
 
         setLoading(false);

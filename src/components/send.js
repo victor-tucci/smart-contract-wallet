@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Loadingscr from './loading';
 import Web3 from 'web3';
+import {tokens} from '../token/tokens';
 import { contractETHTx, contractERC20Tx } from './transaction';
 import ErrorPopup from './errorPopUp';
 
@@ -61,11 +62,36 @@ function SendToken({ address, contractAddress }) {
         }
 
         console.log('Transaction Constructing...');
-        const sendAmount = web3.utils.toWei(amount, 'ether');
+        
 
         try {
-            const { error, message } = await contractETHTx(address, contractAddress, toAddress, sendAmount);
-            
+            var error =false;
+            var message = '';
+            console.log('selected chain type: ', chain);
+            if(chain === 'ethereum') {
+                console.log('eth transaction.........');
+                const sendAmount = web3.utils.toWei(amount, 'ether');
+                const response = await contractETHTx(address, contractAddress, toAddress, sendAmount);
+                error = response.error;
+                message = response.message;
+            }
+            else
+            {
+                if(chain in tokens){
+                    const sendToken = web3.utils.toWei(amount, tokens[chain].decimals);
+                    console.log('tokens[chain].address: ',  tokens[chain].address);
+                    console.log('toAddress: ', toAddress);
+                    console.log('sendToken: ', sendToken);
+                    const response = await contractERC20Tx(address, contractAddress, tokens[chain].address, toAddress, sendToken);
+                    error = response.error;
+                    message = response.message;
+                }
+                else{
+                    handleError(`Chain ${chain} is not supported.`);
+                }
+            }
+
+            // Check if transaction was successful
             if (error) handleError(message);
         } catch (error) {
             console.error('Error in sendTx:', error);

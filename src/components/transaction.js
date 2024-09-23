@@ -166,11 +166,12 @@ export const contractDeployTx = async (ownerAddress, smartWalletAddress) => {
 };
 
 export const contractETHTx = async (ownerAddress, smartWalletAddress, receiverAddress, amount) => {
-    const callData = web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x"]);
+    const callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x"]);
     return createTx(ownerAddress, smartWalletAddress, callData);
 };
 
 export const contractERC20Tx = async (ownerAddress, smartWalletAddress, contractAddress, receiverAddress, tokenAmount) => {
-    const callData = "0x";
+    const data = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Transfer, [receiverAddress,tokenAmount]);
+    const callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data]);
     return createTx(ownerAddress, smartWalletAddress, callData);
 }

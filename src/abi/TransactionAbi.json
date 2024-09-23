@@ -35,5 +35,22 @@
         ],
         "name": "execute",
         "type": "function"
-    }
+    },
+    "ERC20Transfer":{
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "recipient",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "name": "transfer",
+        "type": "function"
+      }
+
 }

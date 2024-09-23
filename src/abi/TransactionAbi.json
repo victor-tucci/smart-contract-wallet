@@ -1,0 +1,39 @@
+{
+    "deployABI": {
+        "inputs": [
+            {
+                "internalType": "bytes",
+                "name": "code",
+                "type": "bytes"
+            },
+            {
+                "internalType": "uint256",
+                "name": "salt",
+                "type": "uint256"
+            }
+        ],
+        "name": "deploy",
+        "type": "function"
+    },
+    "executeABI":{
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "dest",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bytes",
+                "name": "func",
+                "type": "bytes"
+            }
+        ],
+        "name": "execute",
+        "type": "function"
+    }
+}

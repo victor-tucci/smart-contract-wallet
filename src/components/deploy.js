@@ -91,13 +91,13 @@ function DeployContract(props) {
                                 setBalance={setBalance}
                             />
                             {contractInfoFetch && (
-                                <div>
+                                <div style={layer2}>
                                     {isContract ? (
                                         <SendToken address={props.address} contractAddress={contractAddress} />
                                     ) : (
                                         <>
-                                            <p>*Initially fund the wallet and click the create contract for the first time</p>
-                                            <button onClick={deployContract}>Create Contract</button>
+                                            { !(balance > 0.1) && <p style={{color: "red"}}>*Initially fund the wallet and click the create contract for the first time</p>}
+                                            <button onClick={deployContract} style={button}>Create Contract</button>
                                         </>
                                     )}
                                 </div>
@@ -114,4 +114,17 @@ function DeployContract(props) {
     );
 }
 
+const button = {
+    backgroundColor: 'green',
+    color: 'white',
+    borderRadius: '4px',
+    padding: '10px 20px',
+    width: '20%',
+    cursor: 'pointer',
+
+}
+
+const layer2 ={
+    marginTop: '20px',
+}
 export default DeployContract;

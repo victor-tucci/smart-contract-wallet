@@ -57,6 +57,23 @@ export const sendUserOperation = async (userOp) => {
     return opHash;
 };
 
+export const getUserOperationByHash = async (opHash, delay = 3000) => {
+        const response = await bundlerWeb3.currentProvider.sendAsync({
+            jsonrpc: "2.0",
+            method: "skandha_userOperationStatus",
+            params: [opHash],
+            id: new Date().getTime()
+        });
+
+        return response;
+        if (!(response === null) && response.transactionHash) {
+            return response.transactionHash;
+        }
+          
+        // Wait for a specified delay before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
+};
+
 export const personalSignIn = async (userOpHash, address) => {
     const signature = await window.ethereum.request({
         method: "personal_sign",
@@ -153,7 +170,7 @@ export const createTx = async (ownerAddress, smartWalletAddress, callData) => {
 
         console.log('userOperation hash', OpHash);
 
-        return { error: false, message: "" };
+        return { error: false, message: "", opHash:OpHash.result};
     } catch (err) {
         console.error("Error in createTx:", err);
         return { error: true, message: err.message || "Transaction failed." };

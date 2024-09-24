@@ -16,11 +16,11 @@ function App() {
   const [balance, setBalance] = useState(null);
   const [screen, setScreen] = useState(0);
   const [web3, setWeb3] = useState(null);
+  // const [chainId, setChainId] = useState('');
 
-  const btnhandler = () => {
+  const btnhandler = async () => {
     if (window.ethereum) {
-      console.log('Network version:', window.ethereum.networkVersion);
-      // console.log('print rpc:', process.env.RPC_URL);
+     
       // Initialize Web3
       setWeb3(new Web3(window.ethereum));
       
@@ -66,7 +66,31 @@ function App() {
     return () => clearInterval(intervalId); // Cleanup interval on component unmount or address change
   }, [address, web3]);
 
+  // Event listener for account and chain changes
+  useEffect(() => {
+    if (window.ethereum) {
+        // Listen for account changes
+        window.ethereum.on('accountsChanged', (accounts) => {
+            window.location.reload();
+        });
 
+        // Listen for chain changes
+        window.ethereum.on('chainChanged', (chainId) => {
+            // Optional: Reload the page when the chain changes
+            window.location.reload();
+        });
+    }
+
+    // Clean up event listeners when the component unmounts
+    return () => {
+        if (window.ethereum) {
+            window.ethereum.removeListener('accountsChanged', () => {});
+            window.ethereum.removeListener('chainChanged', () => {});
+        }
+    };
+  }, []);
+
+// Render the app based on the screen state
   return (
     <div className='App'>
       <h1>Louice Wallet</h1>
@@ -78,9 +102,6 @@ function App() {
       </Button>
       {screen === 1 && <div>
         <DeployContract address={address} setScreenType={(e) => setScreen(e)} />
-      </div>}
-      {screen === 2 && <div>
-        <SendToken address={address} />
       </div>}
     </div>
   );

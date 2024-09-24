@@ -1,16 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 
-function ErrorPopup({ errorMessage, onClose }) {
-  console.log('errorMessage from errorPopup', errorMessage);
+function SuccessPopUp({ txStatus,txHash, onClose }) {
   
   const popupRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if the clicked element is outside of the popup
-      if (popupRef.current && !popupRef.current.contains(event.target)) {
-        onClose(); // Close popup
-      }
+        // Check if the clicked element is outside of the popup
+        if (popupRef.current && !popupRef.current.contains(event.target)) {
+            if (['OnChain', 'Cancelled', 'Reverted'].includes(txStatus)) {
+                onClose(); // Close popup
+            }
+        }
     };
 
     // Add event listener to detect screen click
@@ -25,8 +26,8 @@ function ErrorPopup({ errorMessage, onClose }) {
   return (
     <div style={styles.overlay}>
       <div style={styles.popup} ref={popupRef}>
-        <h2>Error</h2>
-        <p>{errorMessage}</p>
+        <h2>Transaction ...  <span style={styles.highlight}>{txStatus}</span> </h2>
+        <p style={styles.highlight}>{txHash}</p>
       </div>
     </div>
   );
@@ -46,13 +47,16 @@ const styles = {
   },
   popup: {
     backgroundColor: '#fff',
-    color: 'red',
-    border: '2px solid red',
+    color: 'black',
+    border: '2px solid black',
     padding: '20px',
     borderRadius: '5px',
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
     textAlign: 'center',
   },
+  highlight: {
+    color: 'green',
+  }
 };
 
-export default ErrorPopup;
+export default SuccessPopUp;

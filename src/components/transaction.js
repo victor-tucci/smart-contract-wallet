@@ -66,12 +66,6 @@ export const getUserOperationByHash = async (opHash, delay = 3000) => {
         });
 
         return response;
-        if (!(response === null) && response.transactionHash) {
-            return response.transactionHash;
-        }
-          
-        // Wait for a specified delay before retrying
-        await new Promise(resolve => setTimeout(resolve, delay));
 };
 
 export const personalSignIn = async (userOpHash, address) => {

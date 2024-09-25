@@ -18,6 +18,37 @@ function App() {
   const [web3, setWeb3] = useState(null);
   // const [chainId, setChainId] = useState('');
 
+  async function switchWallet(error) {
+    console.log("Error switching to Amoy Testnet:", error);
+    if (!(error === null) && (error.code === 4902)) {
+
+      const addResult = await window.ethereum.request({
+        "method": "wallet_addEthereumChain",
+        "params": [
+          {
+            blockExplorerUrls: [
+              "https://amoy.polygonscan.com"
+            ],
+            nativeCurrency: {
+              name: "Amoy",
+              symbol: "POL",
+              decimals: 18
+            },
+            rpcUrls: [
+              "https://rpc-amoy.polygon.technology"
+            ],
+            chainId: "0x13882",
+            chainName: "Polygon Amoy Testnet"
+          }
+        ],
+      });
+
+      if (!(addResult === null)) {
+        alert("Please add the network manually in the Metamask extension!");
+      }
+    }
+  }
+
   const btnhandler = async () => {
     if (window.ethereum) {
      
@@ -28,7 +59,23 @@ function App() {
        });
 
       console.log("chain id =",chainId);
-      // if((chainId === )
+      if(!(chainId === 0x13882)){
+        console.log("Chain id not supported, switching to amoy Testnet.");
+        
+        try {
+          await window.ethereum.request({
+            "method": "wallet_switchEthereumChain",
+            "params": [
+              {
+                chainId: "0x13882"
+              }
+            ],
+          });
+        } catch (error) {
+          await switchWallet(error);
+        }
+      }
+
       // Initialize Web3
       setWeb3(new Web3(window.ethereum));
       

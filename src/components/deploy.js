@@ -1,11 +1,12 @@
 import React, { useState,useEffect } from 'react';
 import ContractInfo from './contractDetails';
-import { contractDeployTx } from './transaction';
+import { contractDeployTx, getUserOperationByHash} from './transaction';
 import Loadingscr from './loading';
 import SendToken from './send';
 import Web3 from 'web3';
 
 import ErrorPopup from './errorPopUp';
+import SuccessPopup from './successPopUp';
 
 const web3 = new Web3(window.ethereum);
 
@@ -17,6 +18,8 @@ function DeployContract(props) {
     const [loading, setLoading] = useState(false);
     const [contractAddress, setContractAddress] = useState("");
     const [errorMessage, setErrorMessage] = useState('');
+    const [txStatus, setTxStatus] = useState('');
+    const [txHash, setTxHash] = useState('');
 
     // Debugging function to log error message whenever it changes
     useEffect(() => {
@@ -33,6 +36,8 @@ function DeployContract(props) {
 
     const closePopup = () => {
         setErrorMessage(''); // Clear the error message to close the popup
+        setTxStatus(''); // Clear the tx status to close
+        setTxHash('') // Clear the tx hash to close
     };
 
     async function checkContract(sender) {
@@ -61,17 +66,54 @@ function DeployContract(props) {
 
         setLoading(true);
 
+        var opHash = "";
+        var error = false;
+        var message = '';
+
         try {
-            const{error, message} = await contractDeployTx(props.address, contractAddress);
-
-            if(error)
+            const response = await contractDeployTx(props.address, contractAddress);
+            error = response.error;
+            message = response.message;
+            opHash = response.opHash;
+            
+            if(error){
                 handleError(message);
+                return;
+            }
 
-            await checkContract(contractAddress);
         } catch (error) {
             console.error("Error calling the deploy:", error);
             handleError(error.message); // Ensure any error is caught and displayed
         }
+
+
+        if (!error) {
+            console.log('getUserOperationByHash function calling ...');
+            for (let i = 0; true; i++) {
+                const response = await getUserOperationByHash(opHash);
+                const result = response.result;
+                if (!(result === null) && result.status) {
+                    console.log('Transaction status: ', result.status);
+                    setTxStatus(result.status);
+                    setTxHash(result.transaction);
+
+                    if (['OnChain', 'Cancelled', 'Reverted'].includes(result.status)) {
+                        if (result.status === 'Cancelled' || result.status === 'Reverted') {
+                            handleError(`Transaction is ${result.status}. Try again later`);
+                            return;
+                        } else {
+                            console.log('Transaction completed successfully.');
+                        }
+                        break;
+                    }
+                }
+
+                // Wait for a specified delay before retrying
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
+
+        await checkContract(contractAddress);
 
         setLoading(false);
     };
@@ -79,6 +121,9 @@ function DeployContract(props) {
     return (
         <div>
             {!errorMessage ? (
+                txStatus ? (
+                    <SuccessPopup txStatus={txStatus} txHash={txHash} onClose={closePopup} />
+                ) :
                 <div>
                     {!loading ? (
                         <div>

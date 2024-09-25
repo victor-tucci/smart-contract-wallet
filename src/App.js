@@ -21,6 +21,14 @@ function App() {
   const btnhandler = async () => {
     if (window.ethereum) {
      
+      //check the chain id
+      const chainId = await window.ethereum.request({
+        "method": "eth_chainId",
+        "params": [],
+       });
+
+      console.log("chain id =",chainId);
+      // if((chainId === )
       // Initialize Web3
       setWeb3(new Web3(window.ethereum));
       

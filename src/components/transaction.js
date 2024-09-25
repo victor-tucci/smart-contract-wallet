@@ -11,7 +11,7 @@ import TransactionAbi from '../abi/TransactionAbi.json';
 const EntrypointABI = Entrypoint.abi;
 const web3 = new Web3(window.ethereum);
 
-const USER_OP_RPC_URL = "http://0.0.0.0:14337/rpc";
+const USER_OP_RPC_URL = "http://154.53.58.114:14337/rpc";
 const bundlerWeb3 = new Web3(USER_OP_RPC_URL);
 
 const alchomyUSER_OP_RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/9tr2_JlJ_2LHNy8axYuw2osxj2ogJHpj";

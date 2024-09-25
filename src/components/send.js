@@ -126,7 +126,11 @@ function SendToken({ address, contractAddress }) {
                     setTxHash(result.transaction);
 
                     if (['OnChain', 'Cancelled', 'Reverted'].includes(result.status)) {
-                        console.log('Transaction completed successfully.');
+                        if (result.status === 'Cancelled' || result.status === 'Reverted') {
+                            handleError(`Transaction is ${result.status}. Try again later`);
+                        } else {
+                            console.log('Transaction completed successfully.');
+                        }
                         break;
                     }
                 }

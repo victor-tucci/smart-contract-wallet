@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { ethers } from "ethers";
 import './App.css';
 import { Button } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import DeployContract from './components/deploy';
-import SendToken from './components/send';
 import EoaWalletDetails from "./components/eoaWallet";
 import Web3 from 'web3';
 // import dotenv from 'dotenv';
@@ -58,8 +56,8 @@ function App() {
         "params": [],
        });
 
-      console.log("chain id =",chainId);
-      if(!(chainId === 0x13882)){
+      console.log("chain id =",chainId,(chainId === "0x13882"));
+      if(!(chainId === "0x13882")){
         console.log("Chain id not supported, switching to amoy Testnet.");
         
         try {

@@ -1,6 +1,6 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import ContractInfo from './contractDetails';
-import { contractDeployTx, getUserOperationByHash} from './transaction';
+import { contractDeployTx, getUserOperationByHash } from './transaction';
 import Loadingscr from './loading';
 import SendToken from './send';
 import Web3 from 'web3';
@@ -9,7 +9,6 @@ import ErrorPopup from './errorPopUp';
 import SuccessPopup from './successPopUp';
 
 const web3 = new Web3(window.ethereum);
-
 
 function DeployContract(props) {
     const [isContract, setIsContract] = useState(false);
@@ -29,91 +28,83 @@ function DeployContract(props) {
     }, [errorMessage]);
 
     const handleError = (error) => {
-        setErrorMessage(error); // Set error message in state
-        console.log("Error occurred: ", error); // Log for debugging
+        setErrorMessage(error);
+        console.log("Error occurred: ", error);
         setLoading(false);
     };
 
     const closePopup = () => {
-        setErrorMessage(''); // Clear the error message to close the popup
-        setTxStatus(''); // Clear the tx status to close
-        setTxHash('') // Clear the tx hash to close
+        setErrorMessage('');
+        setTxStatus('');
+        setTxHash('');
     };
 
-    async function checkContract(sender) {
-        if (!sender || !web3) return;
-
+    async function checkIsContract(sender) {
+        if (!sender || !web3) return false;
         try {
             const code = await web3.eth.getCode(sender);
-            if (code !== '0x') {
-                setIsContract(true);
-            } else {
-                setIsContract(false);
-            }
+            console.log('Code:', code);
+            return code !== '0x';
         } catch (error) {
             console.error("Error checking contract:", error);
+            return false;
         }
-    };
+    }
 
     const deployContract = async () => {
-        console.log('Contract deploy constructing...', balance);
-
         if (balance < 0.1) {
-            console.log('Insufficient funds');
             handleError("Insufficient funds to deploy contract.");
             return;
         }
 
         setLoading(true);
 
-        var opHash = "";
-        var error = false;
-        var message = '';
-
         try {
-            const response = await contractDeployTx(props.address, contractAddress);
-            error = response.error;
-            message = response.message;
-            opHash = response.opHash;
-            
-            if(error){
+            const { error, message, opHash } = await contractDeployTx(props.address, contractAddress);
+
+            if (error) {
                 handleError(message);
                 return;
             }
 
-        } catch (error) {
-            console.error("Error calling the deploy:", error);
-            handleError(error.message); // Ensure any error is caught and displayed
-        }
-
-
-        if (!error) {
             console.log('getUserOperationByHash function calling ...');
-            for (let i = 0; true; i++) {
+            for (let i = 0; ; i++) {
                 const response = await getUserOperationByHash(opHash);
                 const result = response.result;
-                if (!(result === null) && result.status) {
-                    console.log('Transaction status: ', result.status);
+                if (result && result.status) {
                     setTxStatus(result.status);
                     setTxHash(result.transaction);
 
-                    if (['OnChain', 'Cancelled', 'Reverted'].includes(result.status)) {
-                        if (result.status === 'Cancelled' || result.status === 'Reverted') {
-                            handleError(`Transaction is ${result.status}. Try again later`);
-                            return;
-                        } else {
-                            console.log('Transaction completed successfully.');
-                        }
+                    if (['Cancelled', 'Reverted'].includes(result.status)) {
+                        handleError(`Transaction is ${result.status}. Try again later.`);
+                        return;
+                    }
+
+                    if (result.status === 'OnChain') {
+                        console.log('Transaction completed successfully.');
                         break;
                     }
                 }
 
-                // Wait for a specified delay before retrying
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
+        } catch (error) {
+            console.error("Error during deployment:", error);
+            handleError(error.message);
         }
 
-        await checkContract(contractAddress);
+        // Check if contract has been created
+        for (let i = 0; i < 10; i++) {
+            const isCon = await checkIsContract(contractAddress);
+            if (isCon) {
+                setIsContract(true);
+                break;
+            }
+            if(i === 9){
+                handleError("Contract has not been created");
+            }
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
 
         setLoading(false);
     };
@@ -123,35 +114,40 @@ function DeployContract(props) {
             {!errorMessage ? (
                 txStatus ? (
                     <SuccessPopup txStatus={txStatus} txHash={txHash} onClose={closePopup} />
-                ) :
-                <div>
-                    {!loading ? (
-                        <div>
-                            <h1>Contract Information</h1>
-                            <ContractInfo
-                                address={props.address}
-                                setIsContract={setIsContract}
-                                setContractInfoFetch={setContractInfoFetch}
-                                setContractAddress={setContractAddress}
-                                setBalance={setBalance}
-                            />
-                            {contractInfoFetch && (
-                                <div style={layer2}>
-                                    {isContract ? (
-                                        <SendToken address={props.address} contractAddress={contractAddress} />
-                                    ) : (
-                                        <>
-                                            { !(balance > 0.1) && <p style={{color: "red"}}>*Initially fund the wallet and click the create contract for the first time</p>}
-                                            <button onClick={deployContract} style={button}>Create Contract</button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <Loadingscr />
-                    )}
-                </div>
+                ) : (
+                    <div>
+                        {!loading ? (
+                            <div>
+                                <h1>Contract Information</h1>
+                                <ContractInfo
+                                    address={props.address}
+                                    setIsContract={setIsContract}
+                                    setContractInfoFetch={setContractInfoFetch}
+                                    setContractAddress={setContractAddress}
+                                    setBalance={setBalance}
+                                />
+                                {contractInfoFetch && (
+                                    <div style={layer2}>
+                                        {isContract ? (
+                                            <SendToken address={props.address} contractAddress={contractAddress} />
+                                        ) : (
+                                            <>
+                                                {balance < 0.1 && (
+                                                    <p style={{ color: "red" }}>
+                                                        * Initially fund the wallet and click create contract for the first time
+                                                    </p>
+                                                )}
+                                                <button onClick={deployContract} style={button}>Create Contract</button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <Loadingscr />
+                        )}
+                    </div>
+                )
             ) : (
                 <ErrorPopup errorMessage={errorMessage} onClose={closePopup} />
             )}
@@ -166,10 +162,10 @@ const button = {
     padding: '10px 20px',
     width: '20%',
     cursor: 'pointer',
+};
 
-}
-
-const layer2 ={
+const layer2 = {
     marginTop: '20px',
-}
+};
+
 export default DeployContract;

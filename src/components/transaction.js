@@ -1,6 +1,8 @@
 import Web3 from 'web3';
 import { ethers } from 'ethers';
 
+import { chainIdandType, chainInfo, ENTRYPOINT_ADDRESS, salt} from './chainInfos';
+
 import Entrypoint from '../abi/EntryPoint.json';
 import Account from '../abi/SimpleAccount.json';
 import AccountFactory from '../abi/AccountFactory.json';
@@ -11,32 +13,57 @@ import TransactionAbi from '../abi/TransactionAbi.json';
 const EntrypointABI = Entrypoint.abi;
 const web3 = new Web3(window.ethereum);
 
-const USER_OP_RPC_URL = "http://154.53.58.114:14337/rpc";
-const bundlerWeb3 = new Web3(USER_OP_RPC_URL);
+const providerChainId = await window.ethereum.request({ method: "eth_chainId" });
 
-const alchomyUSER_OP_RPC_URL = "https://polygon-amoy.g.alchemy.com/v2/9tr2_JlJ_2LHNy8axYuw2osxj2ogJHpj";
-const userOpProvider = new ethers.JsonRpcProvider(alchomyUSER_OP_RPC_URL);
+// const USER_OP_RPC_URL = "http://0.0.0.0:14337/rpc";
+// const bundlerWeb3 = new Web3(USER_OP_RPC_URL);
 
-const ENTRYPOINT_ADDRESS = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
-const FACTORY_ADDRESS = "0x5ed4386F818f34f1f0c5b13C8eD513eDdF407B30";
-const salt = 123;
+// const alchomyUSER_OP_RPC_URL = "https://testnet-rpc.etherspot.io/v1/11155111";
+// const userOpProvider = new ethers.JsonRpcProvider(alchomyUSER_OP_RPC_URL);
 
-const entryContract = new web3.eth.Contract(EntrypointABI, ENTRYPOINT_ADDRESS);
 
-export async function getAddress(initCode) {
+async function getChain(web3){
+    const chainID = await web3.eth.getChainId();  // have to change with metamask provider chain
+    const hexChainID = '0x' + chainID.toString(16);  // Convert to hex format
+
+    console.log("providerChainId... ",hexChainID);
+
+    const chainType = chainIdandType[hexChainID];
+
+    const bundlerWeb3 = new Web3(chainInfo[chainType].USER_OP_RPC_URL);
+    const userOpProvider = new ethers.JsonRpcProvider(chainInfo[chainType].USER_OP_RPC_URL);
+    
+    const entryContract = new web3.eth.Contract(EntrypointABI, ENTRYPOINT_ADDRESS);
+    const FACTORY_ADDRESS = chainInfo[chainType].FACTORY_ADDRESS;
+
+    return {bundlerWeb3, userOpProvider, FACTORY_ADDRESS, entryContract}
+
+}
+
+async function getAddress(entryContract, initCode) {
     var sender;
     try {
         await entryContract.methods.getSenderAddress(initCode).call()
     }
     catch (Ex) {
-        console.log('ex', Ex);
-        sender = "0x" + Ex.data.data.slice(-40);
+        console.log('Exception:', Ex);
+    
+        if (Ex && Ex.data && Ex.data.originalError && Ex.data.originalError.data) {
+            sender = "0x" + Ex.data.originalError.data.slice(-40);
+        } else if (Ex && Ex.data && Ex.data.data) {
+            sender = "0x" + Ex.data.data.slice(-40);
+        } else {
+            console.error('Unable to extract sender address from error.');
+        }
     }
+    
     return sender;
 }
 
-export const estimateUserOperationGas = async (userOp) => {
+const estimateUserOperationGas = async (web3, userOp) => {
     console.log('estimateUserOperationGas function calling ...');
+
+    const {bundlerWeb3} = await getChain(web3);
     const estimateGas = await bundlerWeb3.currentProvider.sendAsync({
         jsonrpc: "2.0",
         method: "eth_estimateUserOperationGas",
@@ -46,8 +73,10 @@ export const estimateUserOperationGas = async (userOp) => {
     return estimateGas;
 };
 
-export const sendUserOperation = async (userOp) => {
+const sendUserOperation = async (web3, userOp) => {
     console.log('sendUserOperation function calling ...');
+
+    const {bundlerWeb3} = await getChain(web3);
     const opHash = await bundlerWeb3.currentProvider.sendAsync({
         jsonrpc: "2.0",
         method: "eth_sendUserOperation",
@@ -57,18 +86,20 @@ export const sendUserOperation = async (userOp) => {
     return opHash;
 };
 
-export const getUserOperationByHash = async (opHash, delay = 3000) => {
-        const response = await bundlerWeb3.currentProvider.sendAsync({
-            jsonrpc: "2.0",
-            method: "skandha_userOperationStatus",
-            params: [opHash],
-            id: new Date().getTime()
-        });
+export const getUserOperationByHash = async (web3, opHash, delay = 3000) => {
 
-        return response;
+    const { bundlerWeb3 } = await getChain(web3);
+    const response = await bundlerWeb3.currentProvider.sendAsync({
+        jsonrpc: "2.0",
+        method: "skandha_userOperationStatus",
+        params: [opHash],
+        id: new Date().getTime()
+    });
+
+    return response;
 };
 
-export const personalSignIn = async (userOpHash, address) => {
+const personalSignIn = async (userOpHash, address) => {
     const signature = await window.ethereum.request({
         method: "personal_sign",
         params: [userOpHash, address],
@@ -101,7 +132,8 @@ const isApiResponseError = async (response) => {
     return false;
 };
 
-export const createTx = async (ownerAddress, smartWalletAddress, callData) => {
+const createTx = async (web3, ownerAddress, smartWalletAddress, callData) => {
+    const {userOpProvider, FACTORY_ADDRESS, entryContract} = await getChain(web3);
     try {
         const AccountBytecode = Account.bytecode;
 
@@ -116,7 +148,7 @@ export const createTx = async (ownerAddress, smartWalletAddress, callData) => {
 
         var initCode = FACTORY_ADDRESS + encodedFunctionCall.slice(2);
 
-        const sender = await getAddress(initCode);
+        const sender = await getAddress(entryContract, initCode);
         console.log({ sender });
 
         if (sender.toLowerCase() !== smartWalletAddress.toLowerCase()) {
@@ -137,7 +169,7 @@ export const createTx = async (ownerAddress, smartWalletAddress, callData) => {
             signature: "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c",
         };
 
-        const gasEstimates = await estimateUserOperationGas(userOp);
+        const gasEstimates = await estimateUserOperationGas(web3, userOp);
         if (await isApiResponseError(gasEstimates))
             return { error: true, message: gasEstimates?.error?.message || "Gas estimate failed."};
 
@@ -158,7 +190,7 @@ export const createTx = async (ownerAddress, smartWalletAddress, callData) => {
 
         console.log({ userOp });
 
-        const OpHash = await sendUserOperation(userOp);
+        const OpHash = await sendUserOperation(web3, userOp);
         if (await isApiResponseError(OpHash))
             return { error: true, message:OpHash?.error?.message || "Failed to send user operation."  };
 
@@ -171,18 +203,18 @@ export const createTx = async (ownerAddress, smartWalletAddress, callData) => {
     }
 };
 
-export const contractDeployTx = async (ownerAddress, smartWalletAddress) => {
+export const contractDeployTx = async (web3, ownerAddress, smartWalletAddress) => {
     const callData = "0x";
-    return createTx(ownerAddress, smartWalletAddress, callData);
+    return createTx(web3, ownerAddress, smartWalletAddress, callData);
 };
 
-export const contractETHTx = async (ownerAddress, smartWalletAddress, receiverAddress, amount) => {
+export const contractETHTx = async (web3, ownerAddress, smartWalletAddress, receiverAddress, amount) => {
     const callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x"]);
-    return createTx(ownerAddress, smartWalletAddress, callData);
+    return createTx(web3, ownerAddress, smartWalletAddress, callData);
 };
 
-export const contractERC20Tx = async (ownerAddress, smartWalletAddress, contractAddress, receiverAddress, tokenAmount) => {
+export const contractERC20Tx = async (web3, ownerAddress, smartWalletAddress, contractAddress, receiverAddress, tokenAmount) => {
     const data = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Transfer, [receiverAddress,tokenAmount]);
     const callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data]);
-    return createTx(ownerAddress, smartWalletAddress, callData);
+    return createTx(web3, ownerAddress, smartWalletAddress, callData);
 }

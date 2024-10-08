@@ -1,110 +1,79 @@
-import React, { useEffect, useState } from "react";
+import logo from './logo.svg';
 import './App.css';
 import { Button } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
-import DeployContract from './components/deploy';
-import EoaWalletDetails from "./components/eoaWallet";
-import Web3 from 'web3';
-// import dotenv from 'dotenv';
 
-// dotenv.config();
+import Web3 from 'web3';
+
+import {switchWallet} from './components/switchWallet';
+import EoaWalletDetails from './components/eoaWallet';
+import ContractPage from './components/contractPage';
+
+import React, { useState, createContext, useEffect} from'react';
+export const Web3Context = createContext();
+
+const chainTypeAndID = {
+  sepolia: {
+    chainId: "0xaa36a7"
+  },
+  amoy: {
+    chainId: "0x13882"
+  }
+}
+
+const chainIdandType = {
+  "0xaa36a7": "sepolia",
+  "0x13882": "amoy"
+}
 
 function App() {
-  const [address, setAddress] = useState("");
-  const [balance, setBalance] = useState(null);
-  const [screen, setScreen] = useState(0);
-  const [web3, setWeb3] = useState(null);
-  // const [chainId, setChainId] = useState('');
+  const [web3, setWeb3] = useState('');
+  const [chainType, setChainType] = useState('amoy');
+  const [selectChainType, setSelectChainType] = useState('amoy');
+  
+  const [address, setAddress] = useState('');
+  const [balance, setBalance] = useState(0);
 
-  async function switchWallet(error) {
-    console.log("Error switching to Amoy Testnet:", error);
-    if (!(error === null) && (error.code === 4902)) {
+  //wallet switch based on the chain type
+  const [isWalletConnected, setIsWalletConnected] =useState(false);
+  const [connectiondone, setChainConnectionDone] = useState(false);
 
-      const addResult = await window.ethereum.request({
-        "method": "wallet_addEthereumChain",
-        "params": [
-          {
-            blockExplorerUrls: [
-              "https://amoy.polygonscan.com"
-            ],
-            nativeCurrency: {
-              name: "Amoy",
-              symbol: "POL",
-              decimals: 18
-            },
-            rpcUrls: [
-              "https://rpc-amoy.polygon.technology"
-            ],
-            chainId: "0x13882",
-            chainName: "Polygon Amoy Testnet"
-          }
-        ],
-      });
+  const handleChainChange = async (chainId) => {
+    const newChainType = chainIdandType[chainId];
+    console.log("handleChainChange newChainType", newChainType);
 
-      if (!(addResult === null)) {
-        alert("Please add the network manually in the Metamask extension!");
-      }
-    }
-  }
+    if(!newChainType){
+      alert("chain id Does not support switching to default chain type");
 
-  const btnhandler = async () => {
-    if (window.ethereum) {
-     
-      //check the chain id
-      const chainId = await window.ethereum.request({
-        "method": "eth_chainId",
-        "params": [],
-       });
-
-      console.log("chain id =",chainId,(chainId === "0x13882"));
-      if(!(chainId === "0x13882")){
-        console.log("Chain id not supported, switching to amoy Testnet.");
-        
-        try {
-          await window.ethereum.request({
-            "method": "wallet_switchEthereumChain",
-            "params": [
-              {
-                chainId: "0x13882"
-              }
-            ],
-          });
-        } catch (error) {
-          await switchWallet(error);
+      if(!(chainTypeAndID[chainType].chainId === chainId)){
+        //perform switch wallet
+        const[error, message] = await switchWallet(chainType);
+        if(!error){
+          setSelectChainType(chainType);
         }
       }
-
-      // Initialize Web3
-      setWeb3(new Web3(window.ethereum));
-      
-      window.ethereum
-        .request({ method: "eth_requestAccounts" })
-        .then((res) => {
-          console.log('Response after the account request to Metamask:', res);
-          accountChangeHandler(res[0]);
-        });
-    } else {
-      alert("Please install the Metamask extension!");
     }
+    else
+      setSelectChainType(newChainType);
   };
 
-  const getBalance = async (address) => {
-    try {
-      const balance = await window.ethereum.request({
-        method: "eth_getBalance",
-        params: [address, "latest"],
+  useEffect(() =>{
+
+      window.ethereum.on("accountsChanged", (accounts) => {
+        accountChangeHandler(accounts[0]);
       });
-      // console.log("Balance is:", balance);
-      setBalance(web3.utils.fromWei(balance, "ether"));
-    } catch (error) {
-      console.error("Error fetching balance:", error);
-    }
-  };
 
-  const accountChangeHandler = (account) => {
-    setAddress(account);
-    setScreen(1);
-  };
+      window.ethereum.on("chainChanged", (chainId) => {
+        handleChainChange(chainId);
+      });
+      
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', () => { });
+        window.ethereum.removeListener('chainChanged', () => { });
+      }
+    };
+  },[]);
 
   useEffect(() => {
     if (!address || !web3) return;
@@ -117,47 +86,113 @@ function App() {
     const intervalId = setInterval(fetchBalance, 5000); // Set interval for balance updates
 
     return () => clearInterval(intervalId); // Cleanup interval on component unmount or address change
-  }, [address, web3]);
+  },[address, web3]);
 
-  // Event listener for account and chain changes
-  useEffect(() => {
-    if (window.ethereum) {
-        // Listen for account changes
-        window.ethereum.on('accountsChanged', (accounts) => {
-            window.location.reload();
-        });
-
-        // Listen for chain changes
-        window.ethereum.on('chainChanged', (chainId) => {
-            // Optional: Reload the page when the chain changes
-            window.location.reload();
-        });
+  useEffect(()=>{
+    if(isWalletConnected && connectiondone){
+      handleButtonClick();
     }
 
-    // Clean up event listeners when the component unmounts
-    return () => {
-        if (window.ethereum) {
-            window.ethereum.removeListener('accountsChanged', () => {});
-            window.ethereum.removeListener('chainChanged', () => {});
-        }
-    };
-  }, []);
+  },[selectChainType, isWalletConnected]);
 
-// Render the app based on the screen state
+  const getBalance = async (address) => {
+    try {
+      const balance = await window.ethereum.request({
+        method: "eth_getBalance",
+        params: [address, "latest"],
+      });
+
+      setBalance(web3.utils.fromWei(balance, "ether"));
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+    }
+  };
+
+  const handleChange = (e) => {
+    setSelectChainType(e.target.value);
+  };
+
+  const accountChangeHandler = (account) => {
+    console.log("Account changed",account);
+    setAddress(account);
+  };
+
+  const handleButtonClick = async () => {
+    console.log("Connecting to wallet...");
+    
+    // connectiondone = false;
+    setChainConnectionDone(false);
+    if (window.ethereum) {
+
+      // wallet is already connected
+      setIsWalletConnected(true);
+
+      const providerChainId = await window.ethereum.request({ method: "eth_chainId" });
+      console.log("selectorChainId,providerChainId", chainTypeAndID[selectChainType].chainId, providerChainId);
+
+      if(!(chainTypeAndID[selectChainType].chainId === providerChainId)){
+        //perform switch wallet
+        const[error, message] = await switchWallet(selectChainType);
+        console.log("wait untill switchWallet done", error, message);
+        if(!error){
+          setChainType(selectChainType);
+        }else{
+          setSelectChainType(chainType); // need to set the old chain type
+          if(message === "pending"){
+
+          }
+        }
+      }else{
+        setChainType(selectChainType);
+      }
+
+      setWeb3(new Web3(window.ethereum));
+
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      
+      accountChangeHandler(accounts[0]);
+
+    }else {
+      alert("Please install the Metamask extension!");
+    }
+
+    // connectiondone = true;
+    setChainConnectionDone(true);
+    console.log("Wallet is connected",connectiondone);
+  }
+
   return (
     <div className='App'>
-      <h1>Louice Wallet</h1>
-      <Button
-        onClick={btnhandler}
-        variant="primary"
-      >
-        {address ? <EoaWalletDetails address={address} Balance={balance} /> : 'Connect Wallet'}
-      </Button>
-      {screen === 1 && <div>
-        <DeployContract address={address} setScreenType={(e) => setScreen(e)} />
-      </div>}
+      <header className="App-header">
+        <h1>Louice Wallet</h1>
+      </header>
+
+      <div>
+        <select value={selectChainType} onChange={handleChange} style={optionBox}>
+          <option value="sepolia">Sepolia</option>
+          <option value="amoy">Amoy</option>
+        </select>
+
+        <Button onClick={handleButtonClick} variant="primary">
+          {address ? <EoaWalletDetails address={address} Balance={balance} /> : 'Connect Wallet'}
+        </Button>
+        <Web3Context.Provider value={web3}>
+          {address && <ContractPage address={address} chainType={chainType} />}
+        </Web3Context.Provider>
+      </div>
+
     </div>
   );
 }
+
+const optionBox = {
+  borderColor: 'black',
+  marginTop: '10px',
+  marginBottom: '10px',
+  marginRight: '10px',
+  padding: '7px',
+  borderRadius: '4px',
+  width: '10%',
+};
 
 export default App;

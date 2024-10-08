@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import Loadingscr from './loading';
-import Web3 from 'web3';
+import React, { useState, useEffect, useContext } from 'react';
+
+import { Web3Context } from '../App';
+
 import {tokens} from '../token/tokens';
 import { contractETHTx, contractERC20Tx, getUserOperationByHash } from './transaction';
+
+import Loadingscr from './loading';
 import ErrorPopup from './errorPopUp';
 import SuccessPopup from './successPopUp';
 
-const web3 = new Web3(window.ethereum);
 
 function SendToken({ address, contractAddress }) {
+    const web3 = useContext(Web3Context);
+
     const [toAddress, setToAddress] = useState('');
     const [amount, setAmount] = useState('');
     const [chain, setChain] = useState('ethereum');
@@ -81,7 +85,7 @@ function SendToken({ address, contractAddress }) {
             if(chain === 'ethereum') {
                 console.log('eth transaction.........');
                 const sendAmount = web3.utils.toWei(amount, 'ether');
-                const response = await contractETHTx(address, contractAddress, toAddress, sendAmount);
+                const response = await contractETHTx(web3, address, contractAddress, toAddress, sendAmount);
                 error = response.error;
                 message = response.message;
                 opHash = response.opHash;
@@ -93,7 +97,7 @@ function SendToken({ address, contractAddress }) {
                     console.log('tokens[chain].address: ',  tokens[chain].address);
                     console.log('toAddress: ', toAddress);
                     console.log('sendToken: ', sendToken);
-                    const response = await contractERC20Tx(address, contractAddress, tokens[chain].address, toAddress, sendToken);
+                    const response = await contractERC20Tx(web3, address, contractAddress, tokens[chain].address, toAddress, sendToken);
                     error = response.error;
                     message = response.message;
                     opHash = response.opHash;
@@ -118,7 +122,7 @@ function SendToken({ address, contractAddress }) {
         if (!error) {
             console.log('getUserOperationByHash function calling ...');
             for (let i = 0; true; i++) {
-                const response = await getUserOperationByHash(opHash);
+                const response = await getUserOperationByHash(web3, opHash);
                 const result = response.result;
                 if (!(result === null) && result.status) {
                     console.log('Transaction status: ', result.status);

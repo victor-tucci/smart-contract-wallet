@@ -1,7 +1,11 @@
+import { ethers } from 'ethers';
+
 import { chainIdandType, chainInfo, ENTRYPOINT_ADDRESS, salt} from './chainInfos';
 
 import AccountFactory from '../abi/AccountFactory.json';
 import Account from '../abi/SimpleAccount.json';
+
+import {tokens} from '../token/tokens';
 
 const AccountFactoryABI = AccountFactory.abi;
 
@@ -47,5 +51,29 @@ export async function fetchBalance(web3, address) {
         }
     } else {
         console.error("Invalid contract address:", address);
+    }
+}
+
+export async function fetchContractBalance(web3, address, chain){
+    console.log("Fetching contract balance",address, chain);
+
+    const erc20ABI = [
+        {
+          constant: true,
+          inputs: [{ name: '_owner', type: 'address' }],
+          name: 'balanceOf',
+          outputs: [{ name: 'balance', type: 'uint256' }],
+          type: 'function',
+        }
+    ]
+    
+    if(chain in tokens){
+        const contractAddress = tokens[chain].address;
+        if(web3.utils.isAddress(contractAddress)){
+            const tokenContract = new web3.eth.Contract(erc20ABI, contractAddress);
+            const balance = await tokenContract.methods.balanceOf(address).call();
+            const formattedBalance = Number(balance) / 10 ** tokens[chain].decimals;
+            return formattedBalance;
+        }
     }
 }

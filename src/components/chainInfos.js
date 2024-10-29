@@ -1,4 +1,5 @@
 export const ENTRYPOINT_ADDRESS = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
+export const PAYMASTER_ADDRESS = "0xDd74396fb58c32247d8E2410e853a73f71053252";
 export const salt = 123;
 
 export const chainIdandType = {

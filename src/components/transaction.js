@@ -1,13 +1,16 @@
 import Web3 from 'web3';
 import { ethers } from 'ethers';
+import axios from 'axios';
 
-import { chainIdandType, chainInfo, ENTRYPOINT_ADDRESS, salt} from './chainInfos';
+import { chainIdandType, chainInfo, ENTRYPOINT_ADDRESS, PAYMASTER_ADDRESS, salt} from './chainInfos';
 
 import Entrypoint from '../abi/EntryPoint.json';
 import Account from '../abi/SimpleAccount.json';
 import AccountFactory from '../abi/AccountFactory.json';
 
 import TransactionAbi from '../abi/TransactionAbi.json';
+
+import {tokens} from '../token/tokens';
 
 // ABI and Web3 setup for Entrypoint contract
 const EntrypointABI = Entrypoint.abi;
@@ -57,7 +60,7 @@ async function getAddress(entryContract, initCode) {
         }
     }
     
-    return sender;
+    return ethers.getAddress(sender);
 }
 
 const estimateUserOperationGas = async (web3, userOp) => {
@@ -132,7 +135,42 @@ const isApiResponseError = async (response) => {
     return false;
 };
 
-const createTx = async (web3, ownerAddress, smartWalletAddress, callData) => {
+const getExchangeRate = async (ERC20_contract) =>{
+    console.log("getExchangeRate(contract address)", ERC20_contract);
+    const pm_data = {
+        jsonrpc: "2.0",
+        id: "0",
+        method: "pm_getApprovedTokens",
+        params:{}
+      }
+      const response = await axios.post('http://127.0.0.1:8000/paymaster', pm_data, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    
+      const data = response.data.result;
+      return data.find(obj => obj.address.toLowerCase() === ERC20_contract.toLowerCase());
+}
+
+async function getSponserFromPaymaster(userOp,ERC20_contract) {
+    const pm_data = {
+        jsonrpc: "2.0",
+        id: "0",
+        method: "pm_sponsorUserOperation",
+        params:{
+          request: userOp,
+          token_address: ERC20_contract
+        }
+      }
+      const response = await axios.post('http://127.0.0.1:8000/paymaster', pm_data, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    
+      console.log("paymasterSignedData: ",response.data.result);
+      return response.data.result;
+}
+
+const createTx = async (web3, ownerAddress, smartWalletAddress, callData, executeParams, paymasterAndData) => {
+    console.log('createTx function calling...');
     const {userOpProvider, FACTORY_ADDRESS, entryContract} = await getChain(web3);
     try {
         const AccountBytecode = Account.bytecode;
@@ -165,7 +203,7 @@ const createTx = async (web3, ownerAddress, smartWalletAddress, callData) => {
             nonce: "0x" + (await entryContract.methods.getNonce(sender, 0).call()).toString(16),
             initCode,
             callData,
-            paymasterAndData: "0x",
+            paymasterAndData,
             signature: "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c",
         };
 
@@ -178,10 +216,26 @@ const createTx = async (web3, ownerAddress, smartWalletAddress, callData) => {
         userOp.preVerificationGas = preVerificationGas;
         userOp.verificationGasLimit = verificationGasLimit;
         userOp.callGasLimit = callGasLimit;
-        userOp.maxPriorityFeePerGas = maxPriorityFeePerGas;
+        // userOp.maxPriorityFeePerGas = maxPriorityFeePerGas;
 
         const { maxFeePerGas } = await userOpProvider.getFeeData();
         userOp.maxFeePerGas = "0x" + maxFeePerGas.toString(16);
+        userOp.maxPriorityFeePerGas = userOp.maxFeePerGas; //temporarily
+
+        if(!(paymasterAndData === "0x")){
+            console.log("Paymaster and data provided");
+            console.log({executeParams});
+            const additionalGas = window.BigInt(35000);
+            const {exchangeRate} = await getExchangeRate(executeParams[3]);
+            console.log("exchangeRate",exchangeRate);
+            const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
+            const actualTokenCost = ((totalGas * window.BigInt(maxFeePerGas) + (additionalGas * window.BigInt(maxFeePerGas))) * window.BigInt(exchangeRate)) / window.BigInt(1e18);
+            const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, actualTokenCost]);
+            userOp.callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [executeParams[0], executeParams[1], executeParams[2], executeParams[3], approveData]);
+            
+            const paymasterData = await getSponserFromPaymaster(userOp, executeParams[3]);
+            userOp.paymasterAndData = PAYMASTER_ADDRESS + paymasterData;
+        }
 
         const userOpHash = await entryContract.methods.getUserOpHash(userOp).call();
         console.log({ userOpHash });
@@ -205,16 +259,54 @@ const createTx = async (web3, ownerAddress, smartWalletAddress, callData) => {
 
 export const contractDeployTx = async (web3, ownerAddress, smartWalletAddress) => {
     const callData = "0x";
-    return createTx(web3, ownerAddress, smartWalletAddress, callData);
+    return createTx(web3, ownerAddress, smartWalletAddress, callData, null, "0x");
 };
 
-export const contractETHTx = async (web3, ownerAddress, smartWalletAddress, receiverAddress, amount) => {
-    const callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x"]);
-    return createTx(web3, ownerAddress, smartWalletAddress, callData);
+export const contractETHTx = async (web3, ownerAddress, smartWalletAddress, receiverAddress, amount, feeERC) => {
+    var callData;
+    var executeParams;
+    var paymasterAndData;
+    if(feeERC === "ethereum"){
+        console.log("normal transaction")
+        callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x", "0x0000000000000000000000000000000000000000", "0x"]);
+        executeParams = [receiverAddress, amount, "0x", "0x0000000000000000000000000000000000000000", "0x"];
+        paymasterAndData = "0x";
+    }
+    else{
+        console.log("ERC20 as a fee transaction",feeERC)
+        const ERC20_contract = tokens[feeERC].address;
+        console.log({ERC20_contract});
+        const dummyAmount = 1 * (10 ** tokens[feeERC].decimals);
+        const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, dummyAmount]);
+        callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [receiverAddress, amount, "0x", ERC20_contract, approveData]);
+        executeParams = [receiverAddress, amount, "0x", ERC20_contract, approveData];
+        paymasterAndData = PAYMASTER_ADDRESS + "F756Dd3123b69795d43cB6b58556b3c6786eAc13010000671a219600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013b5e557e4601a264c654f3f0235ed381fc08b5ffea980e403bc807e27433586b0eb1abe122723125fc4d62ef605943f53a0c87893af3cfd6d33c3924cb0a4328ab0da981c";
+    }
+        
+
+    return createTx(web3, ownerAddress, smartWalletAddress, callData, executeParams, paymasterAndData);
 };
 
-export const contractERC20Tx = async (web3, ownerAddress, smartWalletAddress, contractAddress, receiverAddress, tokenAmount) => {
+export const contractERC20Tx = async (web3, ownerAddress, smartWalletAddress, contractAddress, receiverAddress, tokenAmount, feeERC) => {
     const data = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Transfer, [receiverAddress,tokenAmount]);
-    const callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data]);
-    return createTx(web3, ownerAddress, smartWalletAddress, callData);
+    var callData;
+    var executeParams;
+    var paymasterAndData;
+    if(feeERC === "ethereum"){
+        console.log("normal transaction")
+        callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data, "0x0000000000000000000000000000000000000000", "0x"]);
+        executeParams = [contractAddress, 0, data, "0x0000000000000000000000000000000000000000", "0x"];
+        paymasterAndData = "0x";
+    }
+    else{
+        console.log("ERC20 as a fee transaction",feeERC)
+        const ERC20_contract = tokens[feeERC].address;
+        console.log({ERC20_contract});
+        const dummyAmount = 1 * (10 ** tokens[feeERC].decimals);
+        const approveData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.ERC20Approve, [PAYMASTER_ADDRESS, dummyAmount]);
+        callData = await web3.eth.abi.encodeFunctionCall(TransactionAbi.executeABI, [contractAddress, 0, data, ERC20_contract, approveData]);
+        executeParams = [contractAddress, 0, data, ERC20_contract, approveData];
+        paymasterAndData = PAYMASTER_ADDRESS + "F756Dd3123b69795d43cB6b58556b3c6786eAc13010000671a219600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013b5e557e4601a264c654f3f0235ed381fc08b5ffea980e403bc807e27433586b0eb1abe122723125fc4d62ef605943f53a0c87893af3cfd6d33c3924cb0a4328ab0da981c";
+    }
+    return createTx(web3, ownerAddress, smartWalletAddress, callData, executeParams, paymasterAndData);
 }

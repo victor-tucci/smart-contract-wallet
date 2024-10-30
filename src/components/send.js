@@ -196,6 +196,7 @@ function SendToken({ address, contractAddress }) {
                                     <select value={chain} onChange={handleChange} style={optionBox}>
                                         <option value="ethereum">ETH (native)</option>
                                         <option value="sarvy">SAR</option>
+                                        <option value="ronin">RON</option>
                                     </select>
                                     <p>balance: {chainBalance}</p>
                                     <form>
@@ -226,7 +227,7 @@ function SendToken({ address, contractAddress }) {
                                             <select value={feeType} onChange={handleFeeChange} style={feeOptionBox}>
                                             <option value="ethereum">ETH (native)</option>
                                             <option value="sarvy">SAR</option>
-                                            <option value="shibu">(empty)</option>
+                                            <option value="ronin">RON</option>
                                             <option value="daiCoin">(empty)</option>
                                             <option value="tether">(empty)</option>
                                     </select>

@@ -11,5 +11,11 @@ export const tokens = {
         decimals: 9,
         address: '0xF757Dd3123b69795d43cB6b58556b3c6786eAc13'
     },
+    ronin : {
+        name: 'Ronin',
+        symbol: 'RON',
+        decimals: 9,
+        address: '0x3Fcc9E5f80325dc425C6bB5252B0A9E336d19e61'
+    }
 
 }

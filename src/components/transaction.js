@@ -231,7 +231,7 @@ const createTx = async (web3, ownerAddress, smartWalletAddress, callData, execut
             console.log("exchangeRate",exchangeRate);
             const totalGas = window.BigInt(userOp.preVerificationGas) + window.BigInt(userOp.verificationGasLimit) + window.BigInt(userOp.callGasLimit)
             const actualTokenCost = ((totalGas * window.BigInt(maxFeePerGas) + (additionalGas * window.BigInt(maxFeePerGas))) * window.BigInt(exchangeRate)) / window.BigInt(1e18);
-            const FBalance = Number(actualTokenCost) / tokens[feeType].decimals;
+            const FBalance = Number(actualTokenCost) / 10 ** tokens[feeType].decimals;
             console.log("Transaction actualTokenCost :", FBalance);
             const balance =  await fetchContractBalance(web3, smartWalletAddress, feeType);
             if(FBalance > balance)

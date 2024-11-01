@@ -75,6 +75,7 @@ function SendToken({ address, contractAddress }) {
         setToAddress('');
         setAmount('');
         setChain('ethereum');
+        setFeeType('ethereum');
     };
     const handleError = (error) => {
         setErrorMessage(error); // Set error message in state
@@ -230,7 +231,7 @@ function SendToken({ address, contractAddress }) {
                                             <option value="ronin">RON</option>
                                             <option value="daiCoin">(empty)</option>
                                             <option value="tether">(empty)</option>
-                                    </select>
+                                            </select>
                                         </label>
                                     </form>
                                 </div>

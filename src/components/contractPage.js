@@ -27,6 +27,13 @@ function ContractPage(props) {
     const [txStatus, setTxStatus] = useState('');
     const [txHash, setTxHash] = useState('');
 
+    const [feeType, setFeeType] = useState('ethereum');
+
+    const handleFeeChange = (e) => {
+        console.log('Deploy screen feeType:',e.target.value);
+        setFeeType(e.target.value);
+    };
+
     useEffect(() => {
         console.log('estimate contract address are fetching...', props.address, props.chainType);
         const getContractAddress = async () => {
@@ -111,7 +118,7 @@ function ContractPage(props) {
         setLoading(true);
 
         try {
-            const { error, message, opHash } = await contractDeployTx(web3, props.address, conAddress);
+            const { error, message, opHash } = await contractDeployTx(web3, props.address, conAddress,feeType);
 
             if (error) {
                 handleError(message);
@@ -194,6 +201,17 @@ function ContractPage(props) {
                                                         * Initially fund the wallet and click create contract for the first time
                                                     </p>
                                                 )}
+                                                {/* <label>
+                                                    Deploy Fee: 
+                                                    <select value={feeType} onChange={handleFeeChange} style={feeOptionBox}>
+                                                    <option value="ethereum">ETH (native)</option>
+                                                    <option value="sarvy">SAR</option>
+                                                    <option value="ronin">RON</option>
+                                                    <option value="daiCoin">(empty)</option>
+                                                    <option value="tether">(empty)</option>
+                                                    </select>
+                                                </label>
+                                                <br/> */}
                                                 <button onClick={deployContract} style={button}>Create Contract</button>
                                             </div>
                                         ) : (
@@ -231,5 +249,13 @@ const button = {
 const layer2 = {
     marginTop: '20px',
 };
+
+const feeOptionBox = {
+    borderColor: 'black',
+    marginTop: '10px',
+    marginBottom: '10px',
+    padding: '4px',
+    borderRadius: '4px',
+}
 
 export default ContractPage;
